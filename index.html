@@ -60,6 +60,9 @@ form .rowbtns{margin-top:0}
 .meta{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:3px}
 .pill{display:inline-block;font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--navy-3);color:var(--muted);white-space:nowrap}
 .pill.ok{background:rgba(11,112,72,.12);color:var(--ok)}.pill.warn{background:rgba(238,134,8,.15);color:var(--warn)}.pill.bad{background:rgba(190,46,37,.12);color:var(--bad)}.pill.web{background:rgba(238,134,8,.18);color:var(--orange-soft)}
+.thumb{width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid var(--line);background:var(--navy-3);flex:none}
+.invtop{display:flex;gap:10px;align-items:flex-start;min-width:0}.invtop>div{min-width:0}
+.verweb{display:inline-block;margin-top:5px;font-size:12px;font-weight:700;color:var(--orange-soft);text-decoration:underline}
 .link{color:var(--bad);font-size:12px;font-weight:700;text-decoration:underline;padding:6px 0 6px 6px}
 .actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.actions .btn{flex:1 1 150px}
 .empty{border:1.5px dashed var(--line);border-radius:8px;padding:22px 16px;color:var(--muted);text-align:center}
@@ -136,7 +139,7 @@ async function cargar(){
   if(p.error||i.error)throw p.error||i.error;
   pedidos=w.error?[]:w.data;
   piezas=p.data.map(aPieza);
-  inv=i.data.map(r=>({id:r.id,nombre:r.nombre,precio:r.precio,unidades:r.unidades,shopify:r.publicado_shopify,origen:r.origen}));
+  inv=i.data.map(r=>({id:r.id,nombre:r.nombre,precio:r.precio,unidades:r.unidades,shopify:r.publicado_shopify,origen:r.origen,img:r.imagen_url,url:r.url_web}));
   if(esJefe()){
     const hoy=new Date();hoy.setHours(0,0,0,0);
     const [g,m]=await Promise.all([sb.from('mb_pagos').select('*').gte('fecha',hoy.toISOString()).order('fecha',{ascending:false}),sb.from('mb_miembros').select('user_id,nombre')]);
@@ -225,25 +228,26 @@ function vPagar(){
 }
 
 /* ---------- Pedidos web ---------- */
-const PASOS=[['por_empacar','Por empacar'],['empacado','Empacado'],['enviado','Enviado'],['guia_enviada','Guía enviada'],['entregado','Entregado']];
-const pedPend=()=>pedidos.filter(p=>p.estado!=='entregado'&&p.estado!=='cancelado');
+const PASOS=[['por_empacar','Pendiente'],['empacado','Empacado'],['enviado','Enviado'],['entregado','Entregado']];
+const est=p=>p.estado==='guia_enviada'?'enviado':p.estado;
+const pedPend=()=>pedidos.filter(p=>est(p)==='por_empacar');
 const esHoy=d=>new Date(d).toDateString()===new Date().toDateString();
-const SIG={por_empacar:['empacado','Ya lo empaqué'],empacado:['enviado','Ya lo envié'],enviado:['guia_enviada','Ya mandé la guía'],guia_enviada:['entregado','Ya lo entregaron']};
+const SIG={por_empacar:['empacado','Ya lo empaqué'],empacado:['enviado','Ya lo envié'],enviado:['entregado','Ya lo entregaron']};
 function vPed(){
-  const pend=pedPend(),hoy=pedidos.filter(p=>esHoy(p.creado)),ent=pedidos.filter(p=>p.estado==='entregado');
-  const l=subPed==='pendientes'?pend:subPed==='hoy'?hoy:ent;
+  const por=k=>pedidos.filter(p=>est(p)===k),pend=por('por_empacar'),emp=por('empacado'),env=por('enviado'),ent=por('entregado');
+  const l={pendientes:pend,empacado:emp,enviado:env,entregados:ent}[subPed]||pend;
   const tarjeta=p=>{
-    const i=PASOS.findIndex(x=>x[0]===p.estado),sig=SIG[p.estado];
+    const e=est(p),i=PASOS.findIndex(x=>x[0]===e),sig=SIG[e];
     const items=(p.items||[]).map(it=>`<li><div>${esc(it.nombre)}</div><span class="pill">x${it.cantidad}</span></li>`).join('');
-    return `<article class="card"><div class="top"><div><div class="name">${esc(p.cliente||'Sin nombre')}</div><div class="sub">Pedido ${esc(p.numero)} · ${fecha(p.creado)}${esHoy(p.creado)?' · <b>Nuevo hoy</b>':''}</div></div><span class="pill ${p.estado==='entregado'?'ok':'warn'}">${esc(PASOS[i]?PASOS[i][1]:p.estado)}</span></div>
+    return `<article class="card"><div class="top"><div><div class="name">${esc(p.cliente||'Sin nombre')}</div><div class="sub">Pedido ${esc(p.numero)} · ${fecha(p.creado)}${esHoy(p.creado)?' · <b>Nuevo hoy</b>':''}</div></div><span class="pill ${e==='entregado'?'ok':'warn'}">${esc(PASOS[i]?PASOS[i][1]:p.estado)}</span></div>
     <div class="sub">${p.telefono?'Tel. '+esc(p.telefono)+'<br>':''}${p.email?esc(p.email)+'<br>':''}${esc(p.direccion||'')}${p.ciudad?'<br>'+esc(p.ciudad):''}${p.nota?'<br><i>Nota: '+esc(p.nota)+'</i>':''}</div>
     <ul class="rows">${items}</ul>
     <div class="meta">${PASOS.slice(1).map((x,n)=>`<span class="pill ${n+1<=i?'ok':''}">${n+1<=i?'✓ ':''}${x[1]}</span>`).join('')}</div>
-    ${p.estado==='enviado'||p.estado==='guia_enviada'?`<div><label for="g${p.id}">Número de guía</label><input id="g${p.id}" data-guia="${p.id}" type="text" placeholder="Opcional" value="${esc(p.guia||'')}"></div>`:''}
-    ${sig?`<div class="rowbtns"><button type="button" class="btn small" data-ped="${p.id}" data-nuevo="${sig[0]}">${sig[1]}</button>${i>0?`<button type="button" class="btn small alt" data-ped="${p.id}" data-nuevo="${PASOS[i-1][0]}">Volver un paso</button>`:''}</div>`:`<div class="rowbtns"><button type="button" class="btn small alt" data-ped="${p.id}" data-nuevo="guia_enviada">Volver un paso</button></div>`}</article>`;
+    ${e==='enviado'?`<div><label for="g${p.id}">Número de guía</label><input id="g${p.id}" data-guia="${p.id}" type="text" placeholder="Opcional" value="${esc(p.guia||'')}"></div>`:''}
+    ${sig?`<div class="rowbtns"><button type="button" class="btn small" data-ped="${p.id}" data-nuevo="${sig[0]}">${sig[1]}</button>${i>0?`<button type="button" class="btn small alt" data-ped="${p.id}" data-nuevo="${PASOS[i-1][0]}">Volver un paso</button>`:''}</div>`:`<div class="rowbtns"><button type="button" class="btn small alt" data-ped="${p.id}" data-nuevo="enviado">Volver un paso</button></div>`}</article>`;
   };
   $('#view').innerHTML=`<div><h1>Pedidos web</h1><p class="lead">Pedidos de la tienda. Marca cada paso del envío.</p></div>
-  <div class="seg"><button type="button" data-subped="pendientes" aria-pressed="${subPed==='pendientes'}">Pendientes (${pend.length})</button><button type="button" data-subped="hoy" aria-pressed="${subPed==='hoy'}">Hoy (${hoy.length})</button><button type="button" data-subped="entregados" aria-pressed="${subPed==='entregados'}">Entregados (${ent.length})</button></div>
+  <div class="seg"><button type="button" data-subped="pendientes" aria-pressed="${subPed==='pendientes'}">Pendientes (${pend.length})</button><button type="button" data-subped="empacado" aria-pressed="${subPed==='empacado'}">Empacado (${emp.length})</button><button type="button" data-subped="enviado" aria-pressed="${subPed==='enviado'}">Enviado (${env.length})</button><button type="button" data-subped="entregados" aria-pressed="${subPed==='entregados'}">Entregado (${ent.length})</button></div>
   ${l.length?l.map(tarjeta).join(''):'<div class="empty">No hay pedidos aquí.</div>'}`;
 }
 async function pasoPedido(id,nuevo){
@@ -272,7 +276,7 @@ function vInv(){
     <button class="btn small" type="submit">Agregar</button></form></details>
   <div><label for="buscaInv">Buscar pieza</label><input id="buscaInv" type="search" placeholder="Marca o nombre" value="${esc(buscaInv)}"></div>
   <div class="chips">${[['todas','Todas'],['shopify','En Shopify'],['sin','Sin publicar']].map(([k,n])=>`<button type="button" class="chip" data-invf="${k}" aria-pressed="${invFiltro===k}">${n}</button>`).join('')}</div>
-  ${l.length?`<section class="card"><ul class="rows">${l.map(x=>`<li class="col"><div class="top"><div>${esc(x.nombre)}<div class="meta"><span class="pill ${x.shopify?'web':''}">${x.shopify?'En Shopify':'Sin publicar'}</span>${x.unidades?`<span class="pill">${x.unidades} ${x.unidades===1?'unidad':'unidades'}</span>`:'<span class="pill bad">Agotada</span>'}${x.origen?`<span class="pill warn">${esc(x.origen)}</span>`:''}${carrito[x.id]?`<span class="pill ok">${carrito[x.id]} en el carrito</span>`:''}</div></div><div class="price">${money(x.precio)}</div></div>
+  ${l.length?`<section class="card"><ul class="rows">${l.map(x=>`<li class="col"><div class="top"><div class="invtop">${x.img?`<img class="thumb" src="${esc(x.img)}" alt="" loading="lazy">`:'<div class="thumb"></div>'}<div>${esc(x.nombre)}<div class="meta"><span class="pill ${x.shopify?'web':''}">${x.shopify?'En Shopify':'Sin publicar'}</span>${x.unidades?`<span class="pill">${x.unidades} ${x.unidades===1?'unidad':'unidades'}</span>`:'<span class="pill bad">Agotada</span>'}${x.origen?`<span class="pill warn">${esc(x.origen)}</span>`:''}${carrito[x.id]?`<span class="pill ok">${carrito[x.id]} en el carrito</span>`:''}</div>${x.url?`<a class="verweb" href="${esc(x.url)}" target="_blank" rel="noopener">Ver en la web</a>`:''}</div></div><div class="price">${money(x.precio)}</div></div>
   <div class="rowbtns"><button type="button" class="btn small" data-agregar="${x.id}" ${(carrito[x.id]||0)<x.unidades?'':'disabled'}>Al carrito</button><button type="button" class="btn small alt2" data-usar="${x.id}" ${x.unidades?'':'disabled'}>Separar</button></div></li>`).join('')}</ul></section>`:`<div class="empty">${inv.length?'No hay piezas con esa búsqueda.':'El inventario está vacío. Agrega piezas o espera la sincronización con Shopify.'}</div>`}`;
 }
 function vRes(){
