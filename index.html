@@ -389,7 +389,7 @@ const destinoCampos=(d,de)=>{const n=new Date().toISOString();const base=d==='Ca
 async function confirmar(){
   const h=hoja;
   const necesitaDatos=h.modo==='envio'||esEnvio(h.destino);
-  const dEnv=h.dEnv!==undefined?h.dEnv:(necesitaDatos?{nom:($('#dNom')?.value||'').trim(),tel:($('#dTel')?.value||'').trim(),dir:($('#dDir')?.value||'').trim(),ciu:($('#dCiu')?.value||'').trim()}:null;
+  const dEnv=h.dEnv!==undefined?h.dEnv:(necesitaDatos?{nom:($('#dNom')?.value||'').trim(),tel:($('#dTel')?.value||'').trim(),dir:($('#dDir')?.value||'').trim(),ciu:($('#dCiu')?.value||'').trim()}:null);
   if(h.dEnv===undefined&&dEnv&&(!dEnv.nom||!dEnv.dir||!dEnv.ciu))return toast('Falta el nombre, la dirección o la ciudad del envío');
   cerrar();
   if(h.modo==='carrito'){
