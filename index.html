@@ -474,7 +474,6 @@ document.addEventListener('click',e=>{
   if(d.vender){const x=piezas.find(y=>y.id==d.vender);abrirHoja({modo:'total',cliente:x.cliente,items:[x],marcadas:[x.id],destino:null});return}
   if(d.pagar){const it=porPagar().filter(x=>x.cliente===d.pagar);abrirHoja({modo:'total',cliente:d.pagar,items:it,marcadas:it.map(x=>x.id),destino:null});return}
   if(d.prev){const x=piezas.find(y=>y.id==d.prev);abrirHoja({modo:x.estado==='abonada'?'saldo':'abono',cliente:x.cliente,items:[x],marcadas:[x.id],destino:null});return}
-  if(d.enviar){const it=enCas().filter(x=>x.cliente===d.enviar);abrirHoja({modo:'envio',cliente:d.enviar,items:it,marcadas:it.map(x=>x.id)});return}
   if(d.agregar){const x=inv.find(y=>y.id==d.agregar);carrito[x.id]=(carrito[x.id]||0)+1;toast(x.nombre+' quedó en el carrito');render();return}
   if(d.usar){const x=inv.find(y=>y.id==d.usar);tab='registrar';render();scrollTo(0,0);$('#pieza').value=x.nombre;$('#precio').value=x.precio.toLocaleString('es-CO');$('#cliente').value='';formInv=x.id;$('#cliente').focus();return}
   if(t.id==='verCarrito'){abrirHoja({modo:'carrito',cliente:'',canal,medio:'',destino:null});return}
